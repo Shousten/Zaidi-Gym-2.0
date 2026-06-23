@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>Gym Tracker · Zaidita</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{
+    --rose:#e0366e;--rose-light:#fce7ef;--rose-mid:#f472a8;
+    --cream:#fdf6f0;--charcoal:#1a1a2e;--muted:#6b6b80;
+    --card:#ffffff;--border:#f0d9e8;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{background:var(--cream);color:var(--charcoal);font-family:'Segoe UI',system-ui,sans-serif;margin:0;padding:0;min-height:100vh;}
+  .accent{color:var(--rose);}
+  .btn-rose{background:var(--rose);color:#fff;border:none;border-radius:14px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer;min-height:48px;transition:opacity .2s,transform .1s;}
+  .btn-rose:active{transform:scale(.97);}
+  .btn-ghost{background:transparent;border:1.5px solid var(--rose);color:var(--rose);border-radius:14px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;min-height:44px;transition:background .2s;}
+  .btn-ghost:active{background:var(--rose-light);}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:16px;}
+  .tag{display:inline-block;background:var(--rose-light);color:var(--rose);border-radius:8px;padding:3px 10px;font-size:12px;font-weight:600;}
+  select{background:var(--card);border:1.5px solid var(--border);border-radius:12px;padding:10px 14px;font-size:14px;color:var(--charcoal);min-height:44px;width:100%;appearance:none;cursor:pointer;}
+  .nav-btn{background:transparent;border:none;cursor:pointer;padding:8px;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:56px;font-size:10px;font-weight:600;color:var(--muted);transition:color .2s;}
+  .nav-btn.active{color:var(--rose);}
+  .nav-btn svg{width:22px;height:22px;}
+  .exercise-item{border:1px solid var(--border);border-radius:16px;overflow:hidden;margin-bottom:10px;}
+  .ex-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;background:#fff;min-height:56px;}
+  .ex-body{display:none;background:#fdf6f9;padding:14px 16px;border-top:1px solid var(--border);}
+  .ex-body.open{display:block;}
+  .set-btn{min-width:40px;min-height:40px;border-radius:10px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:13px;font-weight:700;}
+  .set-done{background:var(--rose);color:#fff;border-color:var(--rose);}
+  .timer-ring{transition:stroke-dashoffset .5s linear;}
+  .dot-grid{display:flex;flex-wrap:wrap;gap:6px;}
+  .dot{width:24px;height:24px;border-radius:50%;background:var(--border);border:none;}
+  .dot.present{background:var(--rose);}
+  .dot.absent{background:#f0d9d9;}
+  .streak-num{font-size:36px;font-weight:800;color:var(--rose);}
+  .level-btn{flex:1;padding:10px 8px;border-radius:12px;border:1.5px solid var(--border);background:#fff;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);min-height:44px;transition:all .2s;}
+  .level-btn.active{background:var(--rose);color:#fff;border-color:var(--rose);}
+  .weight-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-bottom:8px;}
+  .pill{background:var(--rose-light);color:var(--rose);border-radius:20px;padding:4px 12px;font-size:12px;font-weight:700;}
+  input[type=checkbox]{width:20px;height:20px;accent-color:var(--rose);cursor:pointer;}
+  .chevron{transition:transform .25s;}
+  .chevron.open{transform:rotate(180deg);}
+  #rest-overlay{display:none;position:fixed;inset:0;background:rgba(26,10,20,.92);z-index:999;flex-direction:column;align-items:center;justify-content:center;}
+  #rest-overlay.show{display:flex;}
+  .section{display:none;}
+  .section.active{display:block;}
+  ::-webkit-scrollbar{width:4px;}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+</style>
+</head>
+<body>
+
+<!-- REST OVERLAY -->
+<div id="rest-overlay">
+  <p style="color:#f9a8d4;font-size:13px;font-weight:600;letter-spacing:.1em;margin-bottom:8px;">DESCANSO</p>
+  <svg width="160" height="160" viewBox="0 0 160 160">
+    <circle cx="80" cy="80" r="68" fill="none" stroke="#3d1a2e" stroke-width="10"/>
+    <circle id="rest-ring" cx="80" cy="80" r="68" fill="none" stroke="#e0366e" stroke-width="10"
+      stroke-dasharray="427" stroke-dashoffset="0" stroke-linecap="round"
+      transform="rotate(-90 80 80)" class="timer-ring"/>
+    <text id="rest-text" x="80" y="88" text-anchor="middle" fill="#f9a8d4" font-size="40" font-weight="800">2:00</text>
+  </svg>
+  <p style="color:#d4a0b8;font-size:14px;margin-top:12px;">Respira y prepárate 💪</p>
+  <button class="btn-ghost" style="margin-top:20px;color:#f9a8d4;border-color:#f9a8d4;" onclick="skipRest()">Saltar descanso</button>
+</div>
+
+<!-- HEADER -->
+<div style="background:var(--card);border-bottom:1px solid var(--border);padding:16px 20px 12px;position:sticky;top:0;z-index:100;">
+  <div style="display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <p style="margin:0;font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.08em;">BIENVENIDA DE VUELTA</p>
+      <h1 style="margin:2px 0 0;font-size:22px;font-weight:800;">Zaidita 🌸</h1>
+    </div>
+    <div id="day-badge" style="text-align:right;">
+      <p style="margin:0;font-size:11px;color:var(--muted);" id="hoy-label">Hoy</p>
+      <p style="margin:0;font-size:13px;font-weight:700;color:var(--rose);" id="routine-badge">...</p>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div style="padding:16px;padding-bottom:90px;max-width:480px;margin:auto;">
+
+  <!-- HOY -->
+  <section id="sec-hoy" class="section active">
+    <div class="card" style="margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <p style="margin:0;font-size:12px;color:var(--muted);font-weight:600;">RUTINA DEL DÍA</p>
+        <p id="routine-title" style="margin:4px 0 2px;font-size:20px;font-weight:800;"></p>
+        <p id="routine-sub" style="margin:0;font-size:13px;color:var(--muted);"></p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+        <button class="btn-ghost" style="font-size:12px;padding:8px 12px;" onclick="nextRoutine()">Cambiar →</button>
+        <button id="rest-toggle" class="btn-ghost" style="font-size:12px;padding:8px 12px;" onclick="toggleRest()">💤 Descanso</button>
+      </div>
+    </div>
+
+    <!-- Attendance quick log -->
+    <div class="card" style="margin-bottom:14px;">
+      <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:var(--muted);">¿Entrenaste hoy?</p>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-rose" style="flex:1;font-size:14px;" onclick="logAttendance(true)">✅ Asistí</button>
+        <button class="btn-ghost" style="flex:1;font-size:14px;" onclick="logAttendance(false)">❌ Falté</button>
+      </div>
+      <p id="att-today" style="margin:10px 0 0;font-size:12px;text-align:center;color:var(--muted);"></p>
+    </div>
+
+    <!-- Exercise list -->
+    <div id="exercise-list"></div>
+
+    <!-- Rest day card -->
+    <div id="rest-card" style="display:none;" class="card">
+      <div style="text-align:center;padding:20px 0;">
+        <div style="font-size:48px;">🌸</div>
+        <h2 style="color:var(--rose);margin:8px 0 4px;">Día de Descanso</h2>
+        <p style="color:var(--muted);font-size:14px;margin:0;">El descanso es parte del progreso.<br>¡Tu cuerpo te lo agradece, Zaidita!</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROGRESO -->
+  <section id="sec-prog" class="section">
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:14px;">Progreso 📈</h2>
+    <div class="card" style="margin-bottom:14px;">
+      <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:var(--muted);">NIVEL DE ENTRENAMIENTO</p>
+      <div style="display:flex;gap:8px;" id="level-btns">
+        <button class="level-btn" data-lvl="beginner" onclick="setLevel('beginner')">Principiante</button>
+        <button class="level-btn" data-lvl="medium" onclick="setLevel('medium')">Intermedia</button>
+        <button class="level-btn" data-lvl="expert" onclick="setLevel('expert')">Experta</button>
+      </div>
+      <p id="level-desc" style="margin:10px 0 0;font-size:13px;color:var(--muted);"></p>
+    </div>
+    <div class="card" style="margin-bottom:14px;">
+      <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:var(--muted);">PESOS REGISTRADOS (kg)</p>
+      <div id="weight-inputs"></div>
+    </div>
+    <div class="card">
+      <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:var(--muted);">HISTORIAL DE PESOS</p>
+      <div id="weight-history"></div>
+    </div>
+  </section>
+
+  <!-- ASISTENCIA -->
+  <section id="sec-asist" class="section">
+    <h2 style="font-size:18px;font-weight:800;margin-bottom:14px;">Asistencia 🏆</h2>
+    <div class="card" style="margin-bottom:14px;text-align:center;">
+      <p style="margin:0 0 4px;font-size:12px;color:var(--muted);font-weight:600;">RACHA ACTUAL</p>
+      <div class="streak-num" id="streak-num">0</div>
+      <p style="margin:0;color:var(--muted);font-size:13px;">días seguidos 🔥</p>
+    </div>
+    <div class="card">
+      <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:var(--muted);">ÚLTIMOS 30 DÍAS</p>
+      <div class="dot-grid" id="dot-grid"></div>
+      <div style="display:flex;gap:16px;margin-top:12px;font-size:12px;color:var(--muted);">
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--rose);margin-right:4px;"></span>Asistí</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f0d9d9;margin-right:4px;"></span>Falté</span>
+        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--border);margin-right:4px;"></span>Sin registro</span>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- BOTTOM NAV -->
+<nav style="position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:8px 0 16px;z-index:100;">
+  <button class="nav-btn active" id="nav-hoy" onclick="showSection('hoy')">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>
+    Hoy
+  </button>
+  <button class="nav-btn" id="nav-prog" onclick="showSection('prog')">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Progreso
+  </button>
+  <button class="nav-btn" id="nav-asist" onclick="showSection('asist')">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    Asistencia
+  </button>
+</nav>
+
+<script>
+const ROUTINES = ['Upper A','Upper B','Lower A','Lower B','Rest'];
+
+const EXERCISES = {
+  'Upper A': {
+    label: 'Espalda & Bíceps',
+    beginner: [
+      {name:'Jalón al Pecho (Agarre Neutro)',target:'Dorsal ancho',sets:3,reps:'10-12',how:'Siéntate en la máquina y sujeta la barra con agarre neutro (palmas enfrentadas). Jala hacia el pecho manteniendo el torso ligeramente reclinado. Baja controlada hasta extensión completa.'},
+      {name:'Remo en Máquina (Sentada)',target:'Dorsal medio, romboides',sets:3,reps:'10-12',how:'Siéntate frente al soporte, sujeta los mangos y rema jalando los codos hacia atrás. Aprieta la espalda en el punto final y regresa lentamente.'},
+      {name:'Face Pulls con Banda',target:'Deltoides posterior, manguito rotador',sets:3,reps:'15',how:'Ancla una banda a altura facial. Agarra los extremos, aléjate y jala hacia tu cara separando los codos. Mantén un segundo de contracción.'},
+      {name:'Curl de Bíceps con Mancuernas',target:'Bíceps',sets:3,reps:'10',how:'De pie, codos pegados al cuerpo, sube las mancuernas girando la muñeca. Baja lentamente contando 3 segundos.'},
+    ],
+    medium: [
+      {name:'Jalón al Pecho con Barra',target:'Dorsal ancho',sets:4,reps:'8-10',how:'Agarre prono a distancia mayor que los hombros. Jala la barra hacia la clavícula arqueando ligeramente el pecho. Contrae el dorsal en el punto bajo.'},
+      {name:'Remo con Mancuerna (Unilateral)',target:'Dorsal, romboides, bíceps',sets:3,reps:'10 c/lado',how:'Apoya una rodilla y mano en un banco. Con la mano libre levanta la mancuerna jalando el codo hacia el techo. Mantén la espalda plana.'},
+      {name:'Face Pulls en Cable',target:'Deltoides posterior, trapecios medios',sets:3,reps:'15',how:'Usa la cuerda en polea alta. Jala hacia tu frente separando los extremos. Mantén postura con escápula neutral.'},
+      {name:'Curl Concentrado de Bíceps',target:'Bíceps (pico)',sets:3,reps:'10 c/lado',how:'Sentada, codo apoyado en el muslo interno. Sube la mancuerna girando la muñeca y aprieta arriba. Baja con control total.'},
+      {name:'Curl Martillo',target:'Braquiorradial, bíceps',sets:3,reps:'10',how:'Palmas enfrentadas en todo el movimiento. Sube alternando brazos o simultáneamente. Codos fijos al cuerpo.'},
+    ],
+    expert: [
+      {name:'Dominadas Asistidas / Pull-ups',target:'Dorsal, bíceps, core',sets:4,reps:'6-8',how:'Cuelga de la barra con agarre supino o prono. Jala el cuerpo hasta que la barbilla supere la barra. Baja de forma excéntrica lenta (3-4 seg). Usa asistencia si es necesario.'},
+      {name:'Remo Pendlay',target:'Dorsal completo, trapecios',sets:4,reps:'6-8',how:'Barra en el suelo entre reps. Torso paralelo al piso, agarre doble prono. Jala explosivamente la barra al ombligo y devuelve al suelo controlado.'},
+      {name:'Face Pulls Cable + Drop Set',target:'Deltoides posterior',sets:3,reps:'12+8',how:'Primer set normal, al fallar reduce peso al instante y continúa hasta 8 más. Mantén la tensión en deltoides posteriores en todo momento.'},
+      {name:'Curl Bíceps en Spider Curl',target:'Bíceps (cabeza larga)',sets:3,reps:'10',how:'Recuéstate boca abajo en banco inclinado. Cuelga los brazos y sube las mancuernas sin mover los codos. Máxima contracción en la cima.'},
+      {name:'Curl de Predicador (EZ Bar)',target:'Bíceps, braquial',sets:3,reps:'8',how:'Usa el banco predicador. Baja la barra EZ hasta casi extensión completa y sube explosivamente. No bloquees el codo abajo.'},
+    ]
+  },
+  'Upper B': {
+    label: 'Hombros & Tríceps',
+    beginner: [
+      {name:'Press de Hombro con Mancuernas (Sentada)',target:'Deltoides anterior y lateral',sets:3,reps:'10-12',how:'Sentada en banco, mancuernas a la altura de las orejas. Empuja hacia arriba sin bloquear los codos. Baja lentamente hasta la posición inicial.'},
+      {name:'Elevaciones Laterales',target:'Deltoides lateral (anchura)',sets:3,reps:'12-15',how:'De pie o sentada, brazos ligeramente doblados. Sube los brazos hasta la altura del hombro. Pinky arriba al tope. Baja lento.'},
+      {name:'Vuelos Posteriores (Pájaros)',target:'Deltoides posterior',sets:3,reps:'12',how:'Inclinada hacia adelante, brazos colgando. Abre los brazos hacia los lados como si volaras. Aprieta la parte trasera del hombro.'},
+      {name:'Press Tríceps en Polea (Cuerda)',target:'Tríceps',sets:3,reps:'12',how:'De pie frente a la polea alta, sujeta la cuerda y extiende los brazos hacia abajo separando los extremos al final. Codos fijos al cuerpo.'},
+    ],
+    medium: [
+      {name:'Press Arnold',target:'Deltoides completo, rotadores',sets:4,reps:'10',how:'Empieza con palmas hacia ti y gira mientras subes para terminar con palmas al frente. Movimiento fluido y controlado.'},
+      {name:'Elevaciones Laterales con Cable',target:'Deltoides lateral',sets:3,reps:'12 c/lado',how:'Polea baja al costado. Mantén el codo ligeramente doblado y sube hasta la horizontal. Mayor tensión constante vs. mancuernas.'},
+      {name:'Face Pull a 45°',target:'Deltoides posterior, manguito',sets:3,reps:'15',how:'Polea alta. Jala la cuerda hacia la frente con codos altos, separando los extremos al final.'},
+      {name:'Extension de Tríceps sobre Cabeza (Mancuerna)',target:'Tríceps cabeza larga',sets:3,reps:'10-12',how:'Sentada, sujeta una mancuerna con ambas manos detrás de la cabeza. Extiende los brazos hacia arriba. Codos apuntando al frente.'},
+      {name:'Fondos en Banco (Triceps Dips)',target:'Tríceps, deltoides anterior',sets:3,reps:'10-12',how:'Manos en el borde del banco, dedos al frente. Baja flexionando los codos a 90° y empuja para subir. Piernas extendidas para más dificultad.'},
+    ],
+    expert: [
+      {name:'Press de Hombro con Barra (Militar)',target:'Deltoides anterior y lateral, trapecios',sets:4,reps:'6-8',how:'Barra a nivel del cuello, agarre ligeramente mayor que los hombros. Empuja hacia arriba manteniendo el core apretado. Baja controlado hasta la barbilla.'},
+      {name:'Elevaciones Laterales 21s',target:'Deltoides lateral',sets:3,reps:'21 (7+7+7)',how:'7 reps mitad inferior, 7 reps mitad superior, 7 reps completas sin descanso. Usa peso moderado; el volumen es el estímulo.'},
+      {name:'Rear Delt Fly en Máquina + Drop Set',target:'Deltoides posterior, romboides',sets:3,reps:'12+8',how:'Ajusta los mangos hacia adelante. Al fallar, reduce peso instantáneamente y continúa. Aprieta la contracción posterior.'},
+      {name:'Skullcrushers (Rompecráneos)',target:'Tríceps (cabeza larga)',sets:4,reps:'8',how:'Recostada, barra EZ sobre la frente. Dobla solo los codos bajando la barra cerca de la frente. Extiende explosivamente. Codos al frente, no abiertos.'},
+      {name:'Fondos en Paralelas',target:'Tríceps, deltoides anterior',sets:3,reps:'8-10',how:'Soporte en paralelas, torso vertical para enfatizar tríceps. Baja hasta que los codos lleguen a 90° y empuja. Evita inclinar demasiado el torso.'},
+    ]
+  },
+  'Lower A': {
+    label: 'Quads & Core (Cadena Anterior)',
+    beginner: [
+      {name:'Sentadillas con Peso Corporal',target:'Cuádriceps, glúteos',sets:3,reps:'12-15',how:'Pies a distancia de hombros, puntas ligeramente afuera. Baja como si fueras a sentarte, rodillas siguiendo la dirección de los pies. Sube empujando desde los talones.'},
+      {name:'Prensa de Pierna',target:'Cuádriceps, glúteos',sets:3,reps:'12',how:'Pies a mitad de la plataforma. Baja el peso hasta que las rodillas lleguen a 90°. Empuja sin bloquear las rodillas al extender.'},
+      {name:'Extensiones de Cuádriceps en Máquina',target:'Cuádriceps aislado',sets:3,reps:'15',how:'Ajusta el respaldo para que las rodillas alineen con el eje. Extiende las piernas completamente y aprieta el cuádriceps arriba. Baja en 3 segundos.'},
+      {name:'Plancha Abdominal',target:'Core completo',sets:3,reps:'30 seg',how:'Codos debajo de los hombros, cuerpo en línea recta desde cabeza a talones. Activa glúteos y abdomen. No dejes caer las caderas.'},
+    ],
+    medium: [
+      {name:'Sentadillas con Barra (Back Squat)',target:'Cuádriceps, glúteos, isquiotibiales',sets:4,reps:'8-10',how:'Barra en la parte alta de los trapecios. Baja hasta que los muslos queden paralelos al suelo. Mantén el pecho alto y las rodillas alineadas. Sube explosivamente.'},
+      {name:'Prensa de Pierna Unilateral',target:'Cuádriceps dominante, estabilizadores',sets:3,reps:'10 c/lado',how:'Una pierna en el centro de la plataforma. Mismo rango de movimiento que la bilateral. Permite corregir asimetrías.'},
+      {name:'Extensiones de Cuádriceps + Pausa',target:'Cuádriceps',sets:3,reps:'12',how:'Al llegar a la extensión completa, mantén 2 segundos de pausa apretando el cuádriceps antes de bajar.'},
+      {name:'Caminata con Mancuernas (Farmer Walk)',target:'Core, trapecios, agarre',sets:3,reps:'30 metros',how:'Sujeta mancuernas pesadas a los lados, hombros atrás, camina 30 metros. Mantén el core activo y la postura erguida.'},
+      {name:'Plancha con Elevación de Brazo',target:'Core, estabilizadores',sets:3,reps:'10 c/lado',how:'En posición de plancha, levanta un brazo al frente manteniéndote estable. Alterna. No rotar las caderas.'},
+    ],
+    expert: [
+      {name:'Sentadilla Frontal',target:'Cuádriceps, core, movilidad',sets:4,reps:'6-8',how:'Barra en los deltoides anteriores, codos altos. Torso muy erguido durante el descenso. Mayor énfasis en cuádriceps y core que la sentadilla trasera.'},
+      {name:'Pistol Squat Asistido / Libre',target:'Cuádriceps, equilibrio, glúteo',sets:3,reps:'5-8 c/lado',how:'De pie sobre una pierna, baja en cuclillas con la otra extendida al frente. Usa un soporte si es necesario. Exigente en movilidad de tobillo y fuerza unilateral.'},
+      {name:'Prensa de Pierna (Pie Alto)',target:'Glúteos, cuádriceps',sets:4,reps:'10',how:'Coloca los pies en la parte superior de la plataforma. Mayor activación glútea. Baja hasta que las rodillas casi toquen el pecho.'},
+      {name:'Extensiones + Drop Set',target:'Cuádriceps',sets:3,reps:'12+8+6',how:'Triple drop set: reduce peso dos veces al alcanzar el fallo. Termina con quemador de 20 reps parciales.'},
+      {name:'Dragon Flag (Núcleo)',target:'Core, abdomen, lumbares',sets:3,reps:'6-8',how:'Acostada, sujeta el banco detrás de la cabeza. Sube las piernas y el torso en línea recta y baja con control sin tocar el suelo.'},
+    ]
+  },
+  'Lower B': {
+    label: 'Isquios, Glúteos & Cadena Posterior',
+    beginner: [
+      {name:'Peso Muerto Rumano (con Mancuernas)',target:'Isquiotibiales, glúteos',sets:3,reps:'10-12',how:'De pie, mancuernas al frente. Bisagra desde las caderas manteniendo la espalda recta, baja las mancuernas por la pierna. Siente el estiramiento en los isquios y sube apretando glúteos.'},
+      {name:'Curl Femoral en Máquina (Acostada)',target:'Isquiotibiales',sets:3,reps:'12',how:'Boca abajo en la máquina. Jala los talones hacia los glúteos. Baja lentamente. Asegúrate de no levantar las caderas.'},
+      {name:'Puente de Glúteos (Hip Thrust con Peso Corporal)',target:'Glúteo mayor, isquios',sets:3,reps:'15',how:'Espalda en banco, pies en el suelo. Baja las caderas y empuja hacia arriba apretando los glúteos en el tope. Mantén 1 segundo arriba.'},
+      {name:'Abducción de Cadera en Máquina',target:'Glúteo medio, TFL',sets:3,reps:'15',how:'Sentada en la máquina. Abre las piernas venciendo la resistencia. Cierra lento y controlado. Espalda pegada al respaldo.'},
+    ],
+    medium: [
+      {name:'Peso Muerto Rumano con Barra',target:'Isquiotibiales, glúteos, erectores',sets:4,reps:'8-10',how:'Barra con agarre prono a la altura de las caderas. Bisagra empujando las caderas hacia atrás. Mantén la barra pegada al cuerpo. Estiramiento máximo de isquios.'},
+      {name:'Hip Thrust con Barra',target:'Glúteo mayor',sets:4,reps:'10',how:'Espalda en banco a 90°, barra en el pliegue de cadera (usa almohadilla). Pies alineados con las rodillas. Empuja explosivamente hacia arriba y aprieta 1 segundo. Baja controlado.'},
+      {name:'Curl Femoral Unilateral (Sentada)',target:'Isquiotibiales',sets:3,reps:'10 c/lado',how:'Usa la máquina en modo unilateral o ajústala. Una pierna a la vez permite aislar mejor y corregir desequilibrios.'},
+      {name:'Sentadilla Sumo (Goblet)',target:'Glúteos, abductores, cuádriceps',sets:3,reps:'12',how:'Pies muy separados, puntas afuera 45°. Sujeta una mancuerna en el pecho. Baja con las rodillas siguiendo la dirección de los pies. Mayor énfasis en glúteo y abductores.'},
+      {name:'Good Morning',target:'Isquiotibiales, erectores, glúteos',sets:3,reps:'12',how:'Barra en trapecios o mancuernas en la nuca. Bisagra hacia adelante manteniendo la espalda neutra. Siente el estiramiento y regresa apretando glúteos.'},
+    ],
+    expert: [
+      {name:'Peso Muerto Convencional',target:'Cadena posterior completa',sets:4,reps:'5-6',how:'Pies a cadera, barra sobre los pies. Agarre doble o alterno. Espalda plana, cadera hacia atrás, empuja el suelo al subir. Extensión completa sin hiperextender la espalda.'},
+      {name:'Hip Thrust + Pausa (con Banda)',target:'Glúteo mayor, medio',sets:4,reps:'8',how:'Añade una banda de resistencia sobre las rodillas para mayor activación del glúteo medio. Pausa 2 segundos arriba con máxima contracción.'},
+      {name:'Curl Femoral Excéntrico',target:'Isquiotibiales (prevención lesiones)',sets:3,reps:'8',how:'Sube usando ambas piernas, baja sólo con una en 4-5 segundos. Alta intensidad excéntrica. Excelente para fuerza de isquios.'},
+      {name:'Sentadilla Búlgara (Bulgarian Split Squat)',target:'Glúteos, cuádriceps, estabilidad',sets:3,reps:'8 c/lado',how:'Pie trasero elevado en banco. Baja la rodilla trasera hacia el suelo manteniendo el torso erguido. Empuja desde el talón del pie delantero.'},
+      {name:'Abducción con Cable (de Pie)',target:'Glúteo medio, fascia lata',sets:3,reps:'15 c/lado',how:'Polea baja con tobillera. De pie lateral a la máquina. Levanta la pierna lateralmente sin inclinar el torso. Mayor rango y tensión que la máquina.'},
+    ]
+  }
+};
+
+const WEIGHT_MOVEMENTS = ['Jalón al Pecho','Remo Unilateral','Press de Hombro','Hip Thrust con Barra','Peso Muerto Rumano','Sentadillas con Barra','Prensa de Pierna'];
+
+let state = {
+  routineIdx: 0,
+  isRestDay: false,
+  level: 'beginner',
+  attendance: {},
+  weights: {},
+  weightHistory: {},
+  sets: {},
+  activeTimer: null
+};
+
+function save(){localStorage.setItem('zt_state',JSON.stringify(state));}
+function load(){
+  const s = localStorage.getItem('zt_state');
+  if(s){ try{ Object.assign(state, JSON.parse(s)); }catch(e){} }
+}
+
+function showSection(id){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  document.getElementById('nav-'+id).classList.add('active');
+  if(id==='asist') renderAttendance();
+  if(id==='prog') renderProgress();
+}
+
+function currentRoutine(){
+  if(state.isRestDay) return 'Rest';
+  return ROUTINES[state.routineIdx % 4];
+}
+
+function nextRoutine(){
+  state.routineIdx = (state.routineIdx + 1) % 4;
+  state.isRestDay = false;
+  state.sets = {};
+  save();
+  renderHoy();
+}
+
+function toggleRest(){
+  state.isRestDay = !state.isRestDay;
+  state.sets = {};
+  save();
+  renderHoy();
+}
+
+function renderHoy(){
+  const r = currentRoutine();
+  const badge = document.getElementById('routine-badge');
+  const title = document.getElementById('routine-title');
+  const sub = document.getElementById('routine-sub');
+  const list = document.getElementById('exercise-list');
+  const restCard = document.getElementById('rest-card');
+  const restToggle = document.getElementById('rest-toggle');
+
+  badge.textContent = r === 'Rest' ? '💤 Descanso' : r;
+  restToggle.textContent = r === 'Rest' ? '🏋️ Entrenar' : '💤 Descanso';
+
+  if(r === 'Rest'){
+    title.textContent = 'Día de Descanso';
+    sub.textContent = 'Tu cuerpo se fortalece mientras descansa';
+    list.innerHTML = '';
+    restCard.style.display = 'block';
+  } else {
+    const data = EXERCISES[r];
+    title.textContent = r;
+    sub.textContent = data.label;
+    restCard.style.display = 'none';
+    renderExercises(r, data);
+  }
+
+  const today = todayKey();
+  const att = state.attendance[today];
+  const attEl = document.getElementById('att-today');
+  if(attEl) attEl.textContent = att === true ? '✅ Marcado: Asistí' : att === false ? '❌ Marcado: Falté' : '';
+}
+
+function renderExercises(routineKey, data){
+  const list = document.getElementById('exercise-list');
+  const lvl = state.level;
+  const exs = data[lvl] || data.beginner;
+  list.innerHTML = '';
+
+  exs.forEach((ex, i) => {
+    const key = routineKey+'_'+i;
+    const sets = state.sets[key] || {done:[], weights:[], currentWeight:''};
+    const item = document.createElement('div');
+    item.className = 'exercise-item';
+    item.id = 'ex-'+key;
+
+    const setsCount = parseInt(ex.sets) || 3;
+    const doneSets = (sets.done||[]).filter(Boolean).length;
+
+    item.innerHTML = `
+      <div class="ex-header" onclick="toggleEx('${key}')">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:15px;font-weight:700;">${ex.name}</span>
+            ${doneSets >= setsCount ? '<span class="pill">✓ Completo</span>' : ''}
+          </div>
+          <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap;">
+            <span class="tag">${ex.target}</span>
+            <span style="font-size:12px;color:var(--muted);padding-top:2px;">${ex.sets} series × ${ex.reps}</span>
+          </div>
+        </div>
+        <svg class="chevron" id="chev-${key}" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="ex-body" id="body-${key}">
+        <p style="font-size:13px;color:var(--muted);margin:0 0 12px;line-height:1.6;background:#fff8fc;border-radius:10px;padding:10px;">${ex.how}</p>
+        <p style="font-size:12px;font-weight:700;color:var(--muted);margin:0 0 8px;">PESO USADO</p>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:12px;">
+          <select id="wsel-${key}" onchange="saveWeight('${key}',this.value)">
+            ${weightOptions(sets.currentWeight)}
+          </select>
+          <span style="padding:10px 8px;font-size:12px;color:var(--muted);">kg</span>
+        </div>
+        <p style="font-size:12px;font-weight:700;color:var(--muted);margin:0 0 8px;">SERIES</p>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;" id="sets-row-${key}">
+          ${renderSetButtons(key, setsCount, sets.done)}
+        </div>
+        <div id="timer-area-${key}"></div>
+      </div>`;
+    list.appendChild(item);
+  });
+}
+
+function weightOptions(selected){
+  let opts = '<option value="">-- kg --</option>';
+  for(let w=5;w<=200;w+=5){
+    opts += `<option value="${w}" ${selected==w?'selected':''}>${w} kg</option>`;
+  }
+  return opts;
+}
+
+function renderSetButtons(key, total, done){
+  let html = '';
+  for(let i=0;i<total;i++){
+    const isDone = done && done[i];
+    html += `<button class="set-btn ${isDone?'set-done':''}" onclick="startSet('${key}',${i},${total})">${isDone?'✓':(i+1)}</button>`;
+  }
+  return html;
+}
+
+function toggleEx(key){
+  const body = document.getElementById('body-'+key);
+  const chev = document.getElementById('chev-'+key);
+  body.classList.toggle('open');
+  chev.classList.toggle('open');
+}
+
+function saveWeight(key, val){
+  if(!state.sets[key]) state.sets[key] = {done:[], currentWeight:''};
+  state.sets[key].currentWeight = val;
+  save();
+}
+
+function startSet(key, idx, total){
+  if(!state.sets[key]) state.sets[key] = {done:[], currentWeight:''};
+  const s = state.sets[key];
+  if(s.done && s.done[idx]) return;
+
+  s.stopwatchActive = true;
+  s.stopwatchStart = Date.now();
+  s.currentSetIdx = idx;
+  s.totalSets = total;
+  save();
+
+  const area = document.getElementById('timer-area-'+key);
+  area.innerHTML = `<div style="background:#fff8fc;border-radius:12px;padding:12px;text-align:center;">
+    <p style="margin:0 0 4px;font-size:12px;color:var(--muted);">SERIE ${idx+1} EN CURSO</p>
+    <p style="margin:0 0 10px;font-size:36px;font-weight:800;color:var(--rose);" id="sw-${key}">0:00</p>
+    <button class="btn-rose" style="width:100%;" onclick="finishSet('${key}')">Terminar Serie ✓</button>
+  </div>`;
+
+  if(state._swInterval) clearInterval(state._swInterval);
+  state._swInterval = setInterval(()=>{
+    const el = document.getElementById('sw-'+key);
+    if(!el){ clearInterval(state._swInterval); return; }
+    const secs = Math.floor((Date.now()-s.stopwatchStart)/1000);
+    el.textContent = fmt(secs);
+  }, 500);
+}
+
+function finishSet(key){
+  if(state._swInterval) clearInterval(state._swInterval);
+  const s = state.sets[key];
+  if(!s) return;
+  const idx = s.currentSetIdx;
+  if(!s.done) s.done = [];
+  s.done[idx] = true;
+  s.stopwatchActive = false;
+  save();
+
+  const total = s.totalSets || 4;
+  const row = document.getElementById('sets-row-'+key);
+  if(row) row.innerHTML = renderSetButtons(key, total, s.done);
+
+  const area = document.getElementById('timer-area-'+key);
+  if(area) area.innerHTML = '';
+
+  const doneSets = s.done.filter(Boolean).length;
+  if(doneSets >= total){
+    const exEl = document.getElementById('ex-'+key);
+    if(exEl){
+      const nameEl = exEl.querySelector('.ex-header span');
+      const pillEl = exEl.querySelector('.pill');
+      if(!pillEl && nameEl){
+        const pill = document.createElement('span');
+        pill.className = 'pill';
+        pill.textContent = '✓ Completo';
+        nameEl.after(pill);
+      }
+    }
+  }
+
+  startRestOverlay();
+}
+
+function fmt(secs){
+  const m = Math.floor(secs/60);
+  const s = secs%60;
+  return m+':'+(s<10?'0':'')+s;
+}
+
+let restInterval = null;
+function startRestOverlay(){
+  const overlay = document.getElementById('rest-overlay');
+  overlay.classList.add('show');
+  let rem = 120;
+  updateRestDisplay(rem);
+  if(restInterval) clearInterval(restInterval);
+  restInterval = setInterval(()=>{
+    rem--;
+    updateRestDisplay(rem);
+    if(rem<=0){ clearInterval(restInterval); endRest(); }
+  },1000);
+}
+
+function updateRestDisplay(rem){
+  const circ = 427;
+  const offset = circ - (circ * (rem/120));
+  document.getElementById('rest-ring').style.strokeDashoffset = offset;
+  document.getElementById('rest-text').textContent = fmt(rem);
+  if(rem<=10) document.getElementById('rest-ring').style.stroke = '#f97316';
+}
+
+function endRest(){
+  document.getElementById('rest-overlay').classList.remove('show');
+  document.getElementById('rest-ring').style.stroke = '#e0366e';
+  playBeep();
+}
+
+function skipRest(){
+  clearInterval(restInterval);
+  endRest();
+}
+
+function playBeep(){
+  try{
+    const ctx = new(window.AudioContext||window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type='sine'; o.frequency.value=880;
+    g.gain.setValueAtTime(0.4,ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.8);
+    o.start(); o.stop(ctx.currentTime+0.8);
+  }catch(e){}
+}
+
+function todayKey(){
+  return new Date().toISOString().slice(0,10);
+}
+
+function logAttendance(present){
+  const today = todayKey();
+  state.attendance[today] = present;
+  save();
+  const attEl = document.getElementById('att-today');
+  if(attEl) attEl.textContent = present ? '✅ Marcado: Asistí' : '❌ Marcado: Falté';
+}
+
+function renderAttendance(){
+  const grid = document.getElementById('dot-grid');
+  const streakEl = document.getElementById('streak-num');
+  grid.innerHTML = '';
+  const today = new Date();
+  const keys = [];
+  for(let i=29;i>=0;i--){
+    const d = new Date(today);
+    d.setDate(today.getDate()-i);
+    keys.push(d.toISOString().slice(0,10));
+  }
+  keys.forEach(k=>{
+    const dot = document.createElement('div');
+    dot.className = 'dot';
+    const v = state.attendance[k];
+    if(v===true) dot.classList.add('present');
+    else if(v===false) dot.classList.add('absent');
+    grid.appendChild(dot);
+  });
+  let streak = 0;
+  for(let i=0;i<keys.length;i++){
+    const k = keys[keys.length-1-i];
+    if(state.attendance[k]===true) streak++;
+    else break;
+  }
+  streakEl.textContent = streak;
+}
+
+const LEVEL_DESCS = {
+  beginner: 'Principiante: 3 series, cargas moderadas, ejercicios básicos con buena técnica.',
+  medium: 'Intermedia: 3-4 series, mayor complejidad, técnica sólida requerida.',
+  expert: 'Experta: 4+ series, variantes avanzadas, drop sets, progresión máxima.'
+};
+
+function setLevel(lvl){
+  state.level = lvl;
+  save();
+  document.querySelectorAll('.level-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.lvl===lvl);
+  });
+  document.getElementById('level-desc').textContent = LEVEL_DESCS[lvl];
+  renderHoy();
+}
+
+function renderProgress(){
+  document.querySelectorAll('.level-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.lvl===state.level);
+  });
+  document.getElementById('level-desc').textContent = LEVEL_DESCS[state.level];
+
+  const wi = document.getElementById('weight-inputs');
+  wi.innerHTML = '';
+  WEIGHT_MOVEMENTS.forEach(mv=>{
+    const val = state.weights[mv]||'';
+    const row = document.createElement('div');
+    row.className = 'weight-row';
+    row.innerHTML = `
+      <label style="font-size:13px;font-weight:600;">${mv}</label>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <select style="width:90px;" onchange="logWeight('${mv}',this.value)">
+          ${weightOptions(val)}
+        </select>
+        <button class="btn-rose" style="padding:8px 12px;font-size:12px;border-radius:10px;min-height:40px;" onclick="saveWeightHistory('${mv}')">Guardar</button>
+      </div>`;
+    wi.appendChild(row);
+  });
+
+  renderWeightHistory();
+}
+
+function logWeight(mv, val){
+  state.weights[mv] = val;
+  save();
+}
+
+function saveWeightHistory(mv){
+  const val = state.weights[mv];
+  if(!val) return;
+  if(!state.weightHistory[mv]) state.weightHistory[mv] = [];
+  const today = todayKey();
+  state.weightHistory[mv].push({date:today, kg:val});
+  save();
+  renderWeightHistory();
+}
+
+function renderWeightHistory(){
+  const wh = document.getElementById('weight-history');
+  wh.innerHTML = '';
+  let hasData = false;
+  WEIGHT_MOVEMENTS.forEach(mv=>{
+    const hist = state.weightHistory[mv];
+    if(!hist||!hist.length) return;
+    hasData = true;
+    const last = hist[hist.length-1];
+    const prev = hist.length>1 ? hist[hist.length-2] : null;
+    const diff = prev ? (parseInt(last.kg)-parseInt(prev.kg)) : 0;
+    const diffStr = diff>0?`+${diff}`:diff<0?`${diff}`:'=';
+    const diffColor = diff>0?'var(--rose)':diff<0?'#f97316':'var(--muted)';
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);';
+    row.innerHTML = `<span style="font-size:13px;">${mv}</span>
+      <div style="text-align:right;">
+        <span style="font-size:15px;font-weight:700;">${last.kg} kg</span>
+        ${prev?`<span style="font-size:11px;color:${diffColor};margin-left:6px;">${diffStr} kg</span>`:''}
+        <p style="margin:0;font-size:11px;color:var(--muted);">${last.date}</p>
+      </div>`;
+    wh.appendChild(row);
+  });
+  if(!hasData) wh.innerHTML = '<p style="color:var(--muted);font-size:13px;text-align:center;padding:16px 0;">Guarda tus pesos para ver el progreso 📈</p>';
+}
+
+load();
+renderHoy();
+setInterval(()=>{
+  const d = new Date();
+  const days = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  document.getElementById('hoy-label').textContent = days[d.getDay()]+' '+d.getDate()+'/'+( d.getMonth()+1);
+},1000);
+</script>
+</body>
+</html>
